@@ -32,7 +32,7 @@ const config = {
     projectEndpoint: process.env.AZURE_PROJECT_ENDPOINT || 'https://az-openai-law-1.services.ai.azure.com',
     projectName: process.env.AZURE_PROJECT_NAME || 'az-openai-law-1-project',
     agentName: process.env.AZURE_AGENT_NAME || 'agent-7dec-1',
-    apiVersion: process.env.AZURE_API_VERSION || '2025-11-15-preview',
+    apiVersion: '2025-11-15-preview',
   },
 
   // Logging settings
