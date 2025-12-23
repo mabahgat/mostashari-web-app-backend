@@ -16,7 +16,7 @@ const config = {
   // Security settings
   security: {
     apiKey: process.env.BACKEND_API_KEY,
-    corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    corsOrigins: (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',').map(origin => origin.trim()),
     requireApiKey: process.env.REQUIRE_API_KEY !== 'false',
   },
 
@@ -74,7 +74,7 @@ const logConfig = () => {
   console.log('\n🚀 Loading configuration...');
   console.log(`   Environment: ${config.server.environment}`);
   console.log(`   Port: ${config.server.port}`);
-  console.log(`   CORS Origin: ${config.security.corsOrigin}`);
+  console.log(`   CORS Origins: ${config.security.corsOrigins.join(', ')}`);
   console.log(`   API Key Required: ${config.security.requireApiKey}`);
   console.log(`   Azure Agent: ${config.agent.agentName}`);
   console.log(`   Verbose Logging: ${config.logging.verbose}`);
@@ -93,7 +93,7 @@ const app = express();
 
 // CORS configuration
 app.use(cors({
-  origin: config.security.corsOrigin,
+  origin: config.security.corsOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
