@@ -62,4 +62,22 @@ jobs:
           app-name: 'smrk-backend'
           slot-name: 'Production'
           package: .
+        env:
+          PORT: ${{ vars.PORT }}
+          NODE_ENV: ${{ vars.NODE_ENV }}
+          BACKEND_API_KEY: ${{ secrets.BACKEND_API_KEY }}
+          CORS_ORIGIN: ${{ vars.CORS_ORIGIN }}
+          REQUIRE_API_KEY: 'true'
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_PROJECT_ENDPOINT: ${{ vars.AZURE_PROJECT_ENDPOINT }}
+          AZURE_PROJECT_NAME: ${{ vars.AZURE_PROJECT_NAME }}
+          AZURE_AGENT_NAME: ${{ vars.AZURE_AGENT_NAME }}
+          VERBOSE_LOGGING: ${{ vars.VERBOSE_LOGGING }}
+          LOG_HEADERS: ${{ vars.LOG_HEADERS }}
+          LOG_BODY: ${{ vars.LOG_BODY }}
+          RATE_LIMIT_ENABLED: ${{ vars.RATE_LIMIT_ENABLED }}
+          RATE_LIMIT_WINDOW: ${{ vars.RATE_LIMIT_WINDOW }}
+          RATE_LIMIT_MAX: ${{ vars.RATE_LIMIT_MAX }}
           
