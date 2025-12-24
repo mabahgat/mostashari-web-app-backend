@@ -271,8 +271,8 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-app.listen(config.server.port, () => {
-  console.log(`\n🎉 Backend running on http://localhost:${config.server.port}`);
+app.listen(config.server.port, '0.0.0.0', () => {
+  console.log(`\n🎉 Backend running on http://0.0.0.0:${config.server.port}`);
   console.log('   GET / - Server status');
   console.log('   GET /health - Health check');
   console.log(`   POST /api/generate - Generate content${config.security.requireApiKey ? ' (requires X-API-Key header)' : ''}\n`);
