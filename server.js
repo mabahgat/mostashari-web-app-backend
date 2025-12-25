@@ -9,7 +9,7 @@ const rateLimit = require('express-rate-limit');
 const config = {
   // Server settings
   server: {
-    port: process.env.PORT || 8000,
+    port: process.env.PORT || 8080,
     environment: process.env.NODE_ENV || 'development',
   },
 
