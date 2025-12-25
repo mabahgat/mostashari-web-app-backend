@@ -62,22 +62,75 @@ jobs:
           app-name: 'smrk-backend'
           slot-name: 'Production'
           package: .
-        env:
-          PORT: ${{ vars.PORT }}
-          NODE_ENV: ${{ vars.NODE_ENV }}
-          BACKEND_API_KEY: ${{ secrets.BACKEND_API_KEY }}
-          CORS_ORIGIN: ${{ vars.CORS_ORIGIN }}
-          REQUIRE_API_KEY: 'true'
-          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-          AZURE_PROJECT_ENDPOINT: ${{ vars.AZURE_PROJECT_ENDPOINT }}
-          AZURE_PROJECT_NAME: ${{ vars.AZURE_PROJECT_NAME }}
-          AZURE_AGENT_NAME: ${{ vars.AZURE_AGENT_NAME }}
-          VERBOSE_LOGGING: ${{ vars.VERBOSE_LOGGING }}
-          LOG_HEADERS: ${{ vars.LOG_HEADERS }}
-          LOG_BODY: ${{ vars.LOG_BODY }}
-          RATE_LIMIT_ENABLED: ${{ vars.RATE_LIMIT_ENABLED }}
-          RATE_LIMIT_WINDOW: ${{ vars.RATE_LIMIT_WINDOW }}
-          RATE_LIMIT_MAX: ${{ vars.RATE_LIMIT_MAX }}
+          app-settings-json: |
+            [
+              {
+                "name": "PORT",
+                "value": "8080"
+              },
+              {
+                "name": "NODE_ENV",
+                "value": "production"
+              },
+              {
+                "name": "BACKEND_API_KEY",
+                "value": "${{ secrets.BACKEND_API_KEY }}"
+              },
+              {
+                "name": "CORS_ORIGIN",
+                "value": "${{ vars.CORS_ORIGIN }}"
+              },
+              {
+                "name": "REQUIRE_API_KEY",
+                "value": "true"
+              },
+              {
+                "name": "AZURE_TENANT_ID",
+                "value": "${{ vars.AZURE_TENANT_ID }}"
+              },
+              {
+                "name": "AZURE_CLIENT_ID",
+                "value": "${{ vars.AZURE_CLIENT_ID }}"
+              },
+              {
+                "name": "AZURE_CLIENT_SECRET",
+                "value": "${{ secrets.AZURE_CLIENT_SECRET }}"
+              },
+              {
+                "name": "AZURE_PROJECT_ENDPOINT",
+                "value": "${{ vars.AZURE_PROJECT_ENDPOINT }}"
+              },
+              {
+                "name": "AZURE_PROJECT_NAME",
+                "value": "${{ vars.AZURE_PROJECT_NAME }}"
+              },
+              {
+                "name": "AZURE_AGENT_NAME",
+                "value": "${{ vars.AZURE_AGENT_NAME }}"
+              },
+              {
+                "name": "VERBOSE_LOGGING",
+                "value": "false"
+              },
+              {
+                "name": "LOG_HEADERS",
+                "value": "false"
+              },
+              {
+                "name": "LOG_BODY",
+                "value": "false"
+              },
+              {
+                "name": "RATE_LIMIT_ENABLED",
+                "value": "true"
+              },
+              {
+                "name": "RATE_LIMIT_WINDOW",
+                "value": "900000"
+              },
+              {
+                "name": "RATE_LIMIT_MAX",
+                "value": "100"
+              }
+            ]
           

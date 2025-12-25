@@ -16,7 +16,7 @@ const config = {
   // Security settings
   security: {
     apiKey: process.env.BACKEND_API_KEY,
-    corsOrigins: (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',').map(origin => origin.trim()),
+    corsOrigins: (process.env.CORS_ORIGIN).split(',').map(origin => origin.trim()),
     requireApiKey: process.env.REQUIRE_API_KEY !== 'false',
   },
 
@@ -29,9 +29,9 @@ const config = {
 
   // Azure AI Agent settings
   agent: {
-    projectEndpoint: process.env.AZURE_PROJECT_ENDPOINT || 'https://az-openai-law-1.services.ai.azure.com',
-    projectName: process.env.AZURE_PROJECT_NAME || 'az-openai-law-1-project',
-    agentName: process.env.AZURE_AGENT_NAME || 'agent-7dec-1',
+    projectEndpoint: process.env.AZURE_PROJECT_ENDPOINT,
+    projectName: process.env.AZURE_PROJECT_NAME,
+    agentName: process.env.AZURE_AGENT_NAME,
     apiVersion: '2025-11-15-preview',
   },
 
@@ -58,7 +58,16 @@ const config = {
 
 // Validate required configuration
 const validateConfig = () => {
-  const required = ['AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET', 'BACKEND_API_KEY'];
+  const required = [
+    'AZURE_TENANT_ID',
+    'AZURE_CLIENT_ID',
+    'AZURE_CLIENT_SECRET',
+    'BACKEND_API_KEY',
+    'AZURE_PROJECT_ENDPOINT',
+    'AZURE_PROJECT_NAME',
+    'AZURE_AGENT_NAME',
+    'CORS_ORIGIN',
+  ];
   const missing = required.filter(key => !process.env[key]);
   
   if (missing.length > 0) {
