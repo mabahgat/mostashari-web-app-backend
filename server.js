@@ -215,22 +215,56 @@ app.post('/api/generate', async (req, res) => {
       console.log('\n📡 Calling Azure Agent API...');
       console.log(`   Endpoint: ${azureEndpoint}`);
       console.log(`   Agent: ${config.agent.agentName}`);
+      console.log(`   Token type: ${token.token ? 'Bearer' : 'MISSING'}`);
+    }
+
+    // Validate endpoint URL
+    try {
+      new URL(azureEndpoint);
+    } catch (urlError) {
+      console.error(`❌ Invalid Azure endpoint URL: ${azureEndpoint}`, urlError.message);
+      return res.status(400).json({ error: 'Invalid Azure endpoint configuration' });
+    }
+
+    const requestBody = JSON.stringify({
+      agent: {
+        type: 'agent_reference',
+        name: config.agent.agentName,
+      },
+      input: input,
+    });
+
+    if (config.logging.verbose) {
+      console.log(`   Request body: ${requestBody.substring(0, 200)}...`);
     }
     
-    const response = await fetch(azureEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token.token}`,
-      },
-      body: JSON.stringify({
-        agent: {
-          type: 'agent_reference',
-          name: config.agent.agentName,
+    let response;
+    try {
+      response = await fetch(azureEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token.token}`,
         },
-        input: input,
-      }),
-    });
+        body: requestBody,
+        timeout: 30000, // 30 second timeout
+      });
+    } catch (fetchError) {
+      console.error(`❌ Fetch Error: ${fetchError.message}`);
+      console.error(`   Endpoint: ${azureEndpoint}`);
+      console.error(`   Cause: ${fetchError.cause || 'Unknown'}`);
+      
+      // Provide more specific error message
+      if (fetchError.code === 'ENOTFOUND') {
+        return res.status(503).json({ error: 'Cannot reach Azure endpoint - DNS resolution failed' });
+      } else if (fetchError.code === 'ECONNREFUSED') {
+        return res.status(503).json({ error: 'Azure endpoint refused connection' });
+      } else if (fetchError.message.includes('timeout')) {
+        return res.status(504).json({ error: 'Request timeout - Azure endpoint not responding' });
+      }
+      
+      return res.status(503).json({ error: `Azure connection failed: ${fetchError.message}` });
+    }
 
     if (config.logging.verbose) {
       console.log(`   Response status: ${response.status}`);
@@ -239,7 +273,7 @@ app.post('/api/generate', async (req, res) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`❌ Azure API Error: ${response.status}`, errorText);
-      return res.status(response.status).json({ error: errorText });
+      return res.status(response.status).json({ error: `Azure API Error: ${errorText}` });
     }
 
     const data = await response.json();
