@@ -54,6 +54,12 @@ const config = {
     scope: 'https://ai.azure.com/.default',
     cacheDuration: 3600000, // 1 hour in milliseconds
   },
+
+  // Chat session settings
+  chat: {
+    sessionTimeout: parseInt(process.env.CHAT_SESSION_TIMEOUT || '1800000'), // 30 minutes in milliseconds
+    cleanupInterval: parseInt(process.env.CHAT_CLEANUP_INTERVAL || '60000'), // 1 minute in milliseconds
+  },
 };
 
 // Validate required configuration
@@ -185,7 +191,261 @@ const credential = new ClientSecretCredential(
   config.azure.clientSecret
 );
 
+// Chat session storage
+const chatSessions = new Map();
+
+// Helper function to generate session ID
+const generateSessionId = () => {
+  return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+};
+
+// Helper function to update session activity
+const updateSessionActivity = (sessionId) => {
+  const session = chatSessions.get(sessionId);
+  if (session) {
+    session.lastActivity = Date.now();
+  }
+};
+
+// Cleanup inactive sessions
+const cleanupSessions = () => {
+  const now = Date.now();
+  let cleaned = 0;
+  
+  for (const [sessionId, session] of chatSessions.entries()) {
+    if (now - session.lastActivity > config.chat.sessionTimeout) {
+      chatSessions.delete(sessionId);
+      cleaned++;
+      if (config.logging.verbose) {
+        console.log(`🧹 Cleaned up inactive session: ${sessionId}`);
+      }
+    }
+  }
+  
+  if (cleaned > 0) {
+    console.log(`🧹 Cleaned up ${cleaned} inactive session(s)`);
+  }
+};
+
+// Start cleanup interval
+setInterval(cleanupSessions, config.chat.cleanupInterval);
+
+if (config.logging.verbose) {
+  console.log(`✅ Session cleanup enabled: ${config.chat.sessionTimeout}ms timeout, ${config.chat.cleanupInterval}ms interval`);
+}
+
 // Routes
+
+// Chat endpoint - supports new and existing sessions
+app.post('/api/chat', async (req, res) => {
+  try {
+    const { sessionId, messages, model } = req.body;
+
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: 'Messages array is required' });
+    }
+
+    // Validate message format
+    for (const msg of messages) {
+      if (!msg.role || !msg.content) {
+        return res.status(400).json({ error: 'Each message must have role and content' });
+      }
+      if (!['system', 'user', 'assistant'].includes(msg.role)) {
+        return res.status(400).json({ error: 'Message role must be system, user, or assistant' });
+      }
+    }
+
+    let session;
+    let newSessionId = sessionId;
+
+    // Check if session exists or create new one
+    if (sessionId) {
+      session = chatSessions.get(sessionId);
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found or expired' });
+      }
+      updateSessionActivity(sessionId);
+      // Add new messages to session history
+      session.messages.push(...messages);
+    } else {
+      // Create new session
+      newSessionId = generateSessionId();
+      session = {
+        id: newSessionId,
+        messages: [...messages],
+        createdAt: Date.now(),
+        lastActivity: Date.now(),
+      };
+      chatSessions.set(newSessionId, session);
+      
+      if (config.logging.verbose) {
+        console.log(`\n🆕 New chat session created: ${newSessionId}`);
+      }
+    }
+
+    if (config.logging.verbose) {
+      console.log(`\n💬 Processing chat request...`);
+      console.log(`   Session: ${newSessionId}`);
+      console.log(`   Messages in session: ${session.messages.length}`);
+      console.log(`   New messages: ${messages.length}`);
+    }
+
+    // Get token
+    if (config.logging.verbose) {
+      console.log('\n🔐 Acquiring Azure token...');
+    }
+    const token = await credential.getToken(config.token.scope);
+    if (config.logging.verbose) {
+      console.log('   ✅ Token acquired');
+    }
+
+    // Build Azure AI Foundry agent endpoint (same as /api/generate)
+    const azureEndpoint = `${config.agent.projectEndpoint}/api/projects/${config.agent.projectName}/openai/responses?api-version=${config.agent.apiVersion}`;
+    
+    if (config.logging.verbose) {
+      console.log('\n📡 Calling Azure Agent API...');
+      console.log(`   Endpoint: ${azureEndpoint}`);
+      console.log(`   Agent: ${config.agent.agentName}`);
+    }
+
+    // Prepare request body for agent
+    // Extract the last user message as input
+    const lastUserMessage = [...session.messages].reverse().find(m => m.role === 'user');
+    const input = lastUserMessage ? lastUserMessage.content : '';
+
+    if (!input) {
+      return res.status(400).json({ error: 'No user message found in messages array' });
+    }
+
+    const requestBody = {
+      agent: {
+        type: 'agent_reference',
+        name: config.agent.agentName,
+      },
+      input: input,
+    };
+
+    if (config.logging.verbose) {
+      console.log(`   Request body: ${JSON.stringify(requestBody).substring(0, 200)}...`);
+    }
+    
+    let response;
+    try {
+      response = await fetch(azureEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token.token}`,
+        },
+        body: JSON.stringify(requestBody),
+        timeout: 30000, // 30 second timeout
+      });
+    } catch (fetchError) {
+      console.error(`❌ Fetch Error: ${fetchError.message}`);
+      return res.status(503).json({ error: `Azure connection failed: ${fetchError.message}` });
+    }
+
+    if (config.logging.verbose) {
+      console.log(`   Response status: ${response.status}`);
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Azure API Error: ${response.status}`, errorText);
+      return res.status(response.status).json({ error: `Azure API Error: ${errorText}` });
+    }
+
+    const data = await response.json();
+    
+    // Add assistant's response to session history
+    // Handle both agent response format and standard chat format
+    if (data.choices && data.choices[0] && data.choices[0].message) {
+      session.messages.push(data.choices[0].message);
+    } else if (data.output) {
+      // Agent response format - extract output text
+      session.messages.push({
+        role: 'assistant',
+        content: data.output
+      });
+    }
+    
+    if (config.logging.verbose) {
+      console.log('   ✅ Response received from Azure');
+    }
+    
+    // Add session ID to response
+    const responseData = {
+      ...data,
+      sessionId: newSessionId,
+    };
+    
+    res.json(responseData);
+  } catch (error) {
+    console.error('❌ Error:', error.message);
+    if (config.logging.verbose) {
+      console.error('   Stack:', error.stack);
+    }
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// List all active sessions
+app.get('/api/chat/sessions', async (req, res) => {
+  try {
+    const sessions = [];
+    
+    for (const [sessionId, session] of chatSessions.entries()) {
+      sessions.push({
+        id: session.id,
+        messageCount: session.messages.length,
+        createdAt: new Date(session.createdAt).toISOString(),
+        lastActivity: new Date(session.lastActivity).toISOString(),
+        inactiveDuration: Date.now() - session.lastActivity,
+        timeUntilExpiry: Math.max(0, config.chat.sessionTimeout - (Date.now() - session.lastActivity)),
+      });
+    }
+    
+    res.json({
+      totalSessions: sessions.length,
+      sessions: sessions,
+      sessionTimeout: config.chat.sessionTimeout,
+    });
+  } catch (error) {
+    console.error('❌ Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete a specific session
+app.delete('/api/chat/sessions/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    
+    if (!sessionId) {
+      return res.status(400).json({ error: 'Session ID is required' });
+    }
+    
+    const session = chatSessions.get(sessionId);
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+    
+    chatSessions.delete(sessionId);
+    
+    if (config.logging.verbose) {
+      console.log(`🗑️ Session deleted: ${sessionId}`);
+    }
+    
+    res.json({ 
+      message: 'Session deleted successfully',
+      sessionId: sessionId,
+    });
+  } catch (error) {
+    console.error('❌ Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/generate', async (req, res) => {
   try {
     const { input } = req.body;
@@ -318,5 +578,8 @@ app.listen(config.server.port, '0.0.0.0', () => {
   console.log(`\n🎉 Backend running on http://0.0.0.0:${config.server.port}`);
   console.log('   GET / - Server status');
   console.log('   GET /health - Health check');
-  console.log(`   POST /api/generate - Generate content${config.security.requireApiKey ? ' (requires X-API-Key header)' : ''}\n`);
+  console.log(`   POST /api/generate - Generate content${config.security.requireApiKey ? ' (requires X-API-Key header)' : ''}`);
+  console.log(`   POST /api/chat - Chat with session management${config.security.requireApiKey ? ' (requires X-API-Key header)' : ''}`);
+  console.log(`   GET /api/chat/sessions - List all active sessions${config.security.requireApiKey ? ' (requires X-API-Key header)' : ''}`);
+  console.log(`   DELETE /api/chat/sessions/:sessionId - Delete a session${config.security.requireApiKey ? ' (requires X-API-Key header)' : ''}\n`);
 });
