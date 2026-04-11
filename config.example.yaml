@@ -1,0 +1,121 @@
+# Mode: dev | stage | prod (default: dev)
+# dev   - verbose (debug) logging, in-memory session store (no Redis needed)
+# stage - verbose (debug) logging, Redis session store
+# prod  - info-level logging (JSON), Redis session store, no stack traces in error responses
+mode: dev
+
+server:
+  port: 3000
+  host: "0.0.0.0"
+
+auth:
+  apiKeys:
+    - name: "client-a"
+      key: "replace-with-a-strong-random-key"
+    - name: "client-b"
+      key: "replace-with-another-strong-random-key"
+
+azure:
+  # ── How to find these values ─────────────────────────────────────────────────
+  # 1. Open https://ai.azure.com and navigate to your project.
+  # 2. Click "Overview" → under "Libraries" → copy the "AI Foundry" endpoint.
+  #    It looks like: https://<AIFoundryResourceName>.services.ai.azure.com/api/projects/<ProjectName>
+  # 3. Go to "Models + endpoints" → find your model deployment name.
+  #
+  # ── Authentication ────────────────────────────────────────────────────────────
+  # The Agents API requires Entra ID (Azure AD) authentication — NOT an API key.
+  # You need ONE of the following:
+  #   • Local dev:    run `az login` once (uses Azure CLI credentials)
+  #   • CI/Server:    set env vars: AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET
+  #   • Azure-hosted: Managed Identity is picked up automatically
+  #
+  # The identity/service principal must have the "Azure AI User" or "Contributor"
+  # role on the Azure AI Foundry project resource.
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  # Full Azure AI Foundry project endpoint.
+  # Format: https://<AIFoundryResourceName>.services.ai.azure.com/api/projects/<ProjectName>
+  projectEndpoint: "https://<your-foundry-resource>.services.ai.azure.com/api/projects/<your-project>"
+
+  # The model deployment name — find it under Models + endpoints → Name column.
+  deployment: "gpt-4o"
+
+  # Display name for the agent in Azure AI Foundry (reused if already exists).
+  agentName: "chat-backend-agent"
+
+  # Maximum number of tokens the model may generate per reply.
+  maxTokens: 2048
+
+  # Sampling temperature: 0 = deterministic, 1 = balanced, 2 = very creative.
+  temperature: 0.7
+
+  # System instructions for the agent.
+  systemPrompt: "You are a helpful assistant."
+
+  # API version for the Azure OpenAI Responses API used by POST /generate.
+  responsesApiVersion: "2025-03-01-preview"
+
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
+
+session:
+  timeoutMinutes: 30
+  maxHistoryLength: 100
+
+safeguards:
+  # Max request body size (kilobytes). Protects against large payload attacks.
+  requestBodyLimitKb: 64
+
+  # Global rate limit per IP (applied to all /sessions routes).
+  rateLimitWindowMs: 60000        # window size in milliseconds
+  rateLimitMaxRequests: 60        # max requests per window
+
+  # Stricter limit specifically for POST /sessions (prevents session flooding).
+  sessionCreateLimitMax: 10       # max new sessions per window per IP
+
+  # Max characters allowed in a single user message.
+  maxMessageChars: 4000
+
+  # Max concurrent active sessions per API key / client name.
+  maxSessionsPerClient: 10
+
+  # Hard cap on total concurrent sessions across all clients.
+  maxTotalSessions: 200
+
+  # Milliseconds before an Azure AI Foundry call is aborted.
+  # Returns HTTP 504 to the caller.
+  azureTimeoutMs: 30000
+
+cors:
+  # Origins allowed to call this API from a browser.
+  # Add every origin your web app may be served from.
+  # Use ["*"] to allow all (not recommended for production).
+  # In dev mode, all localhost origins are always allowed automatically.
+  allowedOrigins:
+    - "http://localhost:8000"
+    # - "https://myapp.example.com"
+  allowCredentials: true
+
+search:
+  # DNS suffix for Azure AI Search (rarely needs changing)
+  dnsSuffix: "search.windows.net"
+
+  # Azure AI Search REST API version
+  apiVersion: "2023-11-01"
+
+  # Regulations index — used when mode="regulations" in POST /search
+  regulations:
+    service: "your-search-service-name"   # <service>.search.windows.net
+    key: "your-search-api-key"
+    index: "your-regulations-index-name"
+    semanticConfig: "your-regulations-semantic-config"  # omit to use simple search
+
+  # Cases index — used when mode="cases" in POST /search
+  cases:
+    service: "your-search-service-name"
+    key: "your-search-api-key"
+    index: "your-cases-index-name"
+    semanticConfig: "your-cases-semantic-config"

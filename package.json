@@ -1,23 +1,54 @@
 {
   "name": "search-app-backend",
   "version": "1.0.0",
-  "description": "Backend API for search application",
-  "main": "server.js",
+  "description": "Chat and search API backend forwarding to Azure AI Foundry with session management",
+  "main": "dist/server.js",
   "engines": {
-    "node": ">=18.0.0"
-  },
-  "dependencies": {
-    "@azure/identity": "^4.13.0",
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
-    "express": "^5.2.1",
-    "express-rate-limit": "^8.2.1"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.11"
+    "node": ">=20.0.0"
   },
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "dev:all": "bash dev.sh",
+    "build": "tsc",
+    "build:ui": "cd ui && npm run build",
+    "build:all": "npm run build:ui && npm run build",
+    "start": "node dist/server.js",
+    "lint": "eslint 'src/**/*.ts'",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "chat",
+    "search",
+    "azure",
+    "openai",
+    "session",
+    "api"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@azure/ai-agents": "^1.1.0",
+    "@azure/core-auth": "^1.10.1",
+    "@azure/identity": "^4.13.1",
+    "@types/swagger-ui-express": "^4.1.8",
+    "cors": "^2.8.6",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.3.2",
+    "ioredis": "^5.3.2",
+    "js-yaml": "^4.1.0",
+    "openai": "^4.47.1",
+    "openapi-types": "^12.1.3",
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "^9.0.0",
+    "winston": "^3.11.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.21",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.12.7",
+    "@types/uuid": "^9.0.8",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.4.5"
   }
 }
