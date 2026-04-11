@@ -92,7 +92,7 @@ jobs:
               { "name": "AZURE_PROJECT_NAME",         "value": "${{ vars.AZURE_PROJECT_NAME }}" },
               { "name": "AZURE_DEPLOYMENT",           "value": "${{ vars.AZURE_DEPLOYMENT }}" },
               { "name": "AZURE_AGENT_NAME",           "value": "${{ vars.AZURE_AGENT_NAME }}" },
-              { "name": "SYSTEM_PROMPT",              "value": "${{ secrets.SYSTEM_PROMPT }}" },
+              { "name": "SYSTEM_PROMPT",              "value": "${{ vars.SYSTEM_PROMPT }}" },
               { "name": "CORS_ORIGIN",                "value": "${{ vars.CORS_ORIGIN }}" },
               { "name": "RATE_LIMIT_WINDOW",          "value": "${{ vars.RATE_LIMIT_WINDOW }}" },
               { "name": "RATE_LIMIT_MAX",             "value": "${{ vars.RATE_LIMIT_MAX }}" },
