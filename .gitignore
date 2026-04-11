@@ -1,2 +1,8 @@
 .env
 node_modules/
+dist/
+*.js.map
+config.yaml
+*.log
+src/ui/dist/
+ui/node_modules/
