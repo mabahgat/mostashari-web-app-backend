@@ -51,6 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     permissions:
+      id-token: write
       contents: read
 
     steps:
@@ -62,7 +63,9 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          creds: '{"clientId":"${{ secrets.AZUREAPPSERVICE_CLIENTID_6973A6E318B8487D987BDD96C6CAB504 }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","tenantId":"${{ secrets.AZUREAPPSERVICE_TENANTID_63AC3E2E69E542C7877D1861CBDB1200 }}","subscriptionId":"${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_D12DB3E28AEB4515BDAA90A82C9A6117 }}"}'
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_6973A6E318B8487D987BDD96C6CAB504 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_63AC3E2E69E542C7877D1861CBDB1200 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_D12DB3E28AEB4515BDAA90A82C9A6117 }}
 
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
