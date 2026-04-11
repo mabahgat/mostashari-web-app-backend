@@ -103,6 +103,7 @@ jobs:
               { "name": "CASES_SEARCH_SERVICE",       "value": "${{ vars.CASES_SEARCH_SERVICE }}" },
               { "name": "CASES_SEARCH_KEY",           "value": "${{ secrets.CASES_SEARCH_KEY }}" },
               { "name": "CASES_SEARCH_INDEX",         "value": "${{ vars.CASES_SEARCH_INDEX }}" },
-              { "name": "CASES_SEMANTIC_CONFIG",      "value": "${{ vars.CASES_SEMANTIC_CONFIG }}" }
+              { "name": "CASES_SEMANTIC_CONFIG",      "value": "${{ vars.CASES_SEMANTIC_CONFIG }}" },
+              { "name": "AZURE_TIMEOUT_MS",            "value": "${{ vars.AZURE_TIMEOUT_MS }}" }
             ]
           
