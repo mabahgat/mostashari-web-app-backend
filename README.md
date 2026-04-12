@@ -46,6 +46,9 @@ A Node.js + TypeScript REST API that forwards chat messages to **Azure AI Foundr
   - [Multi-turn conversation walkthrough](#complete-multi-turn-conversation-walkthrough)
   - [Testing error responses](#testing-error-responses)
 - [npm Scripts](#npm-scripts)
+- [Running Tests](#running-tests)
+  - [Backend Tests (Jest)](#backend-tests-jest)
+  - [Frontend Tests (Vitest)](#frontend-tests-vitest)
 
 ---
 
@@ -1183,5 +1186,84 @@ curl -s -X POST "$BASE/sessions" \
 | `npm run build:ui` | Build React UI to `src/ui/dist/` |
 | `npm run build:all` | Build both backend and UI |
 | `npm run dev:all` | Hot-reload backend + Vite HMR UI (same as `./dev.sh`) |
+| `npm test` | Run backend tests |
+| `npm run test:watch` | Run backend tests in watch mode |
+| `npm run test:coverage` | Run backend tests with coverage report |
+
+---
+
+
+<sub>[↑ Back to Table of Contents](#table-of-contents)</sub>
+
+## Running Tests
+
+**Sections:** [Backend Tests (Jest)](#backend-tests-jest) · [Frontend Tests (Vitest)](#frontend-tests-vitest)
+
+The project includes comprehensive test suites for both backend and frontend with 100% coverage targets.
+
+### Backend Tests (Jest)
+
+The backend uses **Jest** with **ts-jest** for unit and integration testing.
+
+**Run all backend tests:**
+```bash
+npm test
+```
+
+**Run tests in watch mode (auto-rerun on file changes):**
+```bash
+npm run test:watch
+```
+
+**Run tests with coverage report:**
+```bash
+npm run test:coverage
+```
+
+Coverage reports are generated in the `coverage/` directory. Open `coverage/lcov-report/index.html` in a browser to view the detailed HTML report.
+
+**Test coverage includes:**
+- Configuration loading (YAML files and environment variables)
+- Authentication middleware (dev/stage/prod modes, API keys, localhost bypass)
+- Error handling (AppError hierarchy, Express errors, upstream errors)
+- Session management (create, read, update, delete, list, expiry)
+- Session stores (In-Memory and Redis implementations)
+- All API routes with validation, timeouts, and error cases
+- Rate limiting
+
+### Frontend Tests (Vitest)
+
+The React UI uses **Vitest** with **React Testing Library** for component testing.
+
+**Run all frontend tests:**
+```bash
+cd ui
+npm test
+```
+
+**Run tests with UI (interactive test runner):**
+```bash
+cd ui
+npm run test:ui
+```
+
+**Run tests with coverage report:**
+```bash
+cd ui
+npm run test:coverage
+```
+
+**Test coverage includes:**
+- API client (all CRUD operations, error handling)
+- ChatPanel component (message sending, error states, loading indicators)
+- MessageBubble component (user/assistant messages, styling, timestamps)
+- SessionList component (rendering, selection, deletion, status display)
+
+**Coverage thresholds:**
+Both backend and frontend are configured with 100% coverage thresholds for:
+- Lines
+- Functions
+- Branches
+- Statements
 
 
