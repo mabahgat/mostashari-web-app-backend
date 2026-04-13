@@ -1,9 +1,9 @@
-import { AgentsClient } from '@azure/ai-agents';
-import { DefaultAzureCredential } from '@azure/identity';
+import { AzureOpenAI } from 'openai';
+import { getBearerTokenProvider, DefaultAzureCredential } from '@azure/identity';
 import { loadConfig } from '../config/loader';
 import logger from './logger';
 
-let agentsClient: AgentsClient | null = null;
+let openaiClient: AzureOpenAI | null = null;
 let agentId: string | null = null;
 
 function isVerbose(): boolean {
@@ -11,60 +11,84 @@ function isVerbose(): boolean {
   return mode === 'dev' || mode === 'stage';
 }
 
-function getClient(): AgentsClient {
-  if (agentsClient) return agentsClient;
+/**
+ * Derives the Azure OpenAI endpoint (openai.azure.com) from the AI Foundry project endpoint.
+ * The Azure OpenAI Assistants API uses cognitiveservices.azure.com audience which works
+ * correctly with managed identity — unlike the AI Foundry Agents API (/api/projects/)
+ * which only accepts user tokens at the ai.azure.com audience.
+ *
+ * e.g. https://az-openai-law-1.services.ai.azure.com/api/projects/az-openai-law-1-project
+ *   →  https://az-openai-law-1.openai.azure.com
+ */
+function getOpenAIEndpoint(projectEndpoint: string): string {
+  const url = new URL(projectEndpoint);
+  const hostname = url.hostname.replace('.services.ai.azure.com', '.openai.azure.com');
+  return `${url.protocol}//${hostname}`;
+}
+
+function getClient(): AzureOpenAI {
+  if (openaiClient) return openaiClient;
 
   const { azure } = loadConfig();
+  const openaiEndpoint = getOpenAIEndpoint(azure.projectEndpoint);
 
-  // Azure AI Foundry Agents API requires Entra ID (Azure AD) authentication.
-  // DefaultAzureCredential automatically picks up auth from:
-  //  • Local dev:       `az login` (Azure CLI)
-  //  • CI / hosted:     AZURE_CLIENT_ID / AZURE_TENANT_ID / AZURE_CLIENT_SECRET env vars
-  //  • Azure-hosted:    Managed Identity
+  // Use cognitiveservices.azure.com scope (not ai.azure.com) — this scope works
+  // correctly with managed identity on the openai.azure.com endpoint.
   const credential = new DefaultAzureCredential();
+  const azureADTokenProvider = getBearerTokenProvider(
+    credential,
+    'https://cognitiveservices.azure.com/.default',
+  );
 
-  agentsClient = new AgentsClient(azure.projectEndpoint, credential);
+  openaiClient = new AzureOpenAI({
+    endpoint: openaiEndpoint,
+    azureADTokenProvider,
+    apiVersion: '2024-05-01-preview',
+  });
 
-  logger.debug('Azure AI Foundry Agents client initialised', {
-    projectEndpoint: azure.projectEndpoint,
+  logger.debug('Azure OpenAI Assistants client initialised', {
+    openaiEndpoint,
     deployment: azure.deployment,
   });
 
-  return agentsClient;
+  return openaiClient;
 }
 
 /**
- * Extracts structured error information from any thrown Azure SDK error.
- * The Azure REST SDK wraps HTTP errors with status, message, and sometimes
- * a `details` or `body` property containing the raw JSON from the service.
+ * Extracts structured error information from any thrown OpenAI SDK error.
  */
-function extractAzureError(err: unknown): { status: number | null; message: string; body: unknown } {
+function extractError(err: unknown): { status: number | null; message: string; body: unknown } {
   if (err && typeof err === 'object') {
     const e = err as Record<string, unknown>;
     const status = typeof e['status'] === 'number' ? e['status'] : null;
     const message = typeof e['message'] === 'string' ? e['message'] : String(err);
-    // Try to capture the raw response body for maximum debugging detail
-    const body = e['body'] ?? e['details'] ?? e['response'] ?? null;
+    const body = e['error'] ?? e['body'] ?? e['response'] ?? null;
     return { status, message, body };
   }
   return { status: null, message: String(err), body: null };
 }
 
+/** Returns true if the Azure AI Foundry agent is ready to handle requests. */
+export function isAgentReady(): boolean {
+  return agentId !== null;
+}
+
 /**
- * Creates (or reuses) the backing Azure AI Foundry agent.
- * Call once on server startup before accepting traffic.
+ * Creates (or reuses) the backing Azure OpenAI assistant.
+ * Uses the openai.azure.com endpoint with cognitiveservices.azure.com scope,
+ * which is fully compatible with managed identity.
  */
 export async function initAgent(): Promise<void> {
   const { azure } = loadConfig();
   const client = getClient();
 
-  // Check if an agent with this name already exists; reuse if found.
+  // Check if an assistant with this name already exists; reuse if found.
   try {
-    const existing = client.listAgents();
-    for await (const a of existing) {
+    const existing = await client.beta.assistants.list({ limit: 100 });
+    for (const a of existing.data) {
       if (a.name === azure.agentName) {
         agentId = a.id;
-        logger.info('Azure AI Foundry agent reused', {
+        logger.info('Azure OpenAI assistant reused', {
           agentId,
           agentName: azure.agentName,
         });
@@ -72,76 +96,72 @@ export async function initAgent(): Promise<void> {
       }
     }
   } catch (listErr) {
-    const { status, message, body } = extractAzureError(listErr);
-    logger.error('✖ Azure AI Foundry — failed to list agents (falling through to create)', {
+    const { status, message, body } = extractError(listErr);
+    logger.error('✖ Azure OpenAI — failed to list assistants', {
       status,
       error: message,
-      azureResponseBody: body,
-      projectEndpoint: azure.projectEndpoint,
+      body,
     });
-    // Re-throw so startup fails loudly — listing usually indicates auth/endpoint issues
     throw listErr;
   }
 
   try {
-    const agent = await client.createAgent(azure.deployment, {
+    const agent = await client.beta.assistants.create({
+      model: azure.deployment,
       name: azure.agentName,
       instructions: azure.systemPrompt,
-      // Note: temperature is NOT passed here — some models (e.g. gpt-5-mini)
-      // reject it at the agent level. It can be passed per-run if needed.
     });
 
     agentId = agent.id;
-    logger.info('Azure AI Foundry agent created', {
+    logger.info('Azure OpenAI assistant created', {
       agentId,
       agentName: azure.agentName,
       deployment: azure.deployment,
     });
   } catch (createErr) {
-    const { status, message, body } = extractAzureError(createErr);
-    logger.error('✖ Azure AI Foundry — failed to create agent', {
+    const { status, message, body } = extractError(createErr);
+    logger.error('✖ Azure OpenAI — failed to create assistant', {
       status,
       error: message,
-      azureResponseBody: body,
-      projectEndpoint: azure.projectEndpoint,
+      body,
       deployment: azure.deployment,
     });
     throw createErr;
   }
 }
 
-/** Creates a new Azure thread and returns its ID. */
+/** Creates a new OpenAI thread and returns its ID. */
 export async function createThread(): Promise<string> {
   const client = getClient();
-  const thread = await client.threads.create();
+  const thread = await client.beta.threads.create();
   logger.debug('Azure thread created', { threadId: thread.id });
   return thread.id;
 }
 
-/** Deletes an Azure thread (called when a session is terminated). */
+/** Deletes an OpenAI thread (called when a session is terminated). */
 export async function deleteThread(threadId: string): Promise<void> {
   try {
     const client = getClient();
-    await client.threads.delete(threadId);
+    await client.beta.threads.del(threadId);
     logger.debug('Azure thread deleted', { threadId });
   } catch (err) {
-    const { status, message, body } = extractAzureError(err);
+    const { status, message, body } = extractError(err);
     logger.warn('Could not delete Azure thread (non-fatal)', {
       threadId,
       status,
       error: message,
-      azureResponseBody: body,
+      body,
     });
   }
 }
 
 /**
- * Posts a user message to the thread, runs the agent, and returns the reply.
- * Azure maintains the full conversation history inside the thread.
+ * Posts a user message to the thread, runs the assistant, and returns the reply.
+ * OpenAI maintains the full conversation history inside the thread.
  */
 export async function sendMessage(threadId: string, userMessage: string): Promise<string> {
   if (!agentId) {
-    throw new Error('Azure AI Foundry agent is not initialised. Call initAgent() on startup.');
+    throw new Error('Azure OpenAI assistant is not initialised. Call initAgent() on startup.');
   }
 
   const { azure } = loadConfig();
@@ -149,7 +169,7 @@ export async function sendMessage(threadId: string, userMessage: string): Promis
   const verbose = isVerbose();
 
   if (verbose) {
-    logger.debug('→ Azure AI Foundry Agents request', {
+    logger.debug('→ Azure OpenAI Assistants request', {
       threadId,
       agentId,
       deployment: azure.deployment,
@@ -158,43 +178,39 @@ export async function sendMessage(threadId: string, userMessage: string): Promis
   }
 
   try {
-    // Post the user message to the thread
-    await client.messages.create(threadId, 'user', userMessage);
+    await client.beta.threads.messages.create(threadId, {
+      role: 'user',
+      content: userMessage,
+    });
 
-    // Create a run and poll until it completes (blocked until done)
-    const run = await client.runs.createAndPoll(threadId, agentId);
+    const run = await client.beta.threads.runs.createAndPoll(threadId, {
+      assistant_id: agentId,
+    });
 
     if (run.status !== 'completed') {
-      throw new Error(`Azure run ended with status "${run.status}". Check agent configuration.`);
+      throw new Error(`Azure run ended with status "${run.status}". Check assistant configuration.`);
     }
 
-    // Retrieve the most recent assistant message
     let reply: string | null = null;
-    const allMessages = client.messages.list(threadId, { order: 'desc' });
-    for await (const msg of allMessages) {
+    const allMessages = await client.beta.threads.messages.list(threadId, { order: 'desc' });
+    for (const msg of allMessages.data) {
       if (msg.role === 'assistant') {
-        // Content may be an array of blocks; extract the first text block
-        const content = msg.content;
-        if (Array.isArray(content)) {
-          for (const block of content) {
-            if (block.type === 'text' && 'text' in block) {
-              reply = (block as { type: 'text'; text: { value: string } }).text.value;
-              break;
-            }
+        for (const block of msg.content) {
+          if (block.type === 'text') {
+            reply = block.text.value;
+            break;
           }
-        } else if (typeof content === 'string') {
-          reply = content;
         }
         break;
       }
     }
 
     if (!reply) {
-      throw new Error('Azure AI Foundry returned an empty response');
+      throw new Error('Azure OpenAI assistant returned an empty response');
     }
 
     if (verbose) {
-      logger.debug('← Azure AI Foundry Agents response', {
+      logger.debug('← Azure OpenAI Assistants response', {
         threadId,
         runId: run.id,
         runStatus: run.status,
@@ -204,41 +220,36 @@ export async function sendMessage(threadId: string, userMessage: string): Promis
 
     return reply;
   } catch (err: unknown) {
-    const { status, message: rawMessage, body } = extractAzureError(err);
+    const { status, message: rawMessage, body } = extractError(err);
 
-    logger.error('✖ Azure AI Foundry Agents error', {
+    logger.error('✖ Azure OpenAI Assistants error', {
       status,
       threadId,
       agentId,
       deployment: azure.deployment,
-      projectEndpoint: azure.projectEndpoint,
       error: rawMessage,
-      azureResponseBody: body,
+      body,
     });
 
     if (status !== null) {
       if (status === 404) {
         throw new Error(
-          `Azure AI Foundry Agents error 404 — resource not found.\n` +
-          `Check in config.yaml:\n` +
-          `  • azure.projectEndpoint must be in the format:\n` +
-          `    https://<AIFoundryResourceName>.services.ai.azure.com/api/projects/<ProjectName>\n` +
-          `  • azure.deployment must match the exact model deployment name in the project\n` +
-          `Current values: projectEndpoint="${azure.projectEndpoint}", deployment="${azure.deployment}"`
+          `Azure OpenAI Assistants error 404 — resource not found.\n` +
+          `Check azure.projectEndpoint and azure.deployment in config.`
         );
       }
       if (status === 401) {
         throw new Error(
-          `Azure AI Foundry authentication failed (401). ` +
-          `Verify azure.apiKey in config.yaml — use the key from AI Foundry → project → Settings → Keys.`
+          `Azure OpenAI authentication failed (401). ` +
+          `Verify managed identity has 'Cognitive Services OpenAI User' role on the AI resource.`
         );
       }
       if (status === 429) {
         throw new Error(
-          `Azure AI Foundry rate limit exceeded (429). Try again shortly or increase quota in Azure.`
+          `Azure OpenAI rate limit exceeded (429). Try again shortly or increase quota.`
         );
       }
-      throw new Error(`Azure AI Foundry Agents error (${status}): ${rawMessage}`);
+      throw new Error(`Azure OpenAI Assistants error (${status}): ${rawMessage}`);
     }
     throw err;
   }

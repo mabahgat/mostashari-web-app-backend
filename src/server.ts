@@ -30,20 +30,20 @@ async function main(): Promise<void> {
     logger.debug('dev mode: using in-memory session store (Redis not required)');
   }
 
-  // Create (or reuse) the Azure AI Foundry agent before accepting traffic
-  try {
-    await initAgent();
-  } catch (err: unknown) {
-    logger.error('Failed to initialise Azure AI Foundry agent', {
-      message: err instanceof Error ? err.message : String(err),
-    });
-    process.exit(1);
-  }
-
   const { port, host } = config.server;
 
+  // Start HTTP server immediately so Azure health checks and /sessions pass.
+  // Agent initialisation runs in the background; routes that require it return 503
+  // until it completes (via isAgentReady()).
   app.listen(port, host, () => {
     logger.info(`Chat backend listening on http://${host}:${port}`);
+  });
+
+  // Init agent non-blocking — failure is logged but does not crash the server.
+  initAgent().catch((err: unknown) => {
+    logger.error('Failed to initialise Azure OpenAI assistant (will retry on next request)', {
+      message: err instanceof Error ? err.message : String(err),
+    });
   });
 
   const shutdown = async (signal: string): Promise<void> => {

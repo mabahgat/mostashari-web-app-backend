@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { getSession, appendMessages } from '../services/sessionService';
-import { sendMessage } from '../services/azureService';
+import { sendMessage, isAgentReady } from '../services/azureService';
 import { NotFoundError, ValidationError, UpstreamError, AppError } from '../middleware/errors';
 import { Message } from '../types';
 import logger from '../services/logger';
@@ -12,6 +12,11 @@ const router = Router();
 // POST /sessions/:id/messages — send a chat message within a session
 router.post('/:id/messages', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    if (!isAgentReady()) {
+      res.status(503).json({ error: 'Service is starting up — Azure OpenAI assistant not yet initialised. Please retry in a few seconds.' });
+      return;
+    }
+
     const { safeguards } = loadConfig();
 
     const idSchema = z.string().uuid();
