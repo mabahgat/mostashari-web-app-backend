@@ -25,14 +25,14 @@ const AzureConfigSchema = z.object({
   // Model deployment name — find it under Models + endpoints → your deployment → Name.
   deployment: z.string().min(1),
 
-  // Display name for the agent that will be created/reused in Azure AI Foundry.
-  agentName: z.string().default('chat-backend-agent'),
+  // Display name for the agent to reference in Azure AI Foundry.
+  agentName: z.string().min(1),
+
+  // Version of the agent to reference (e.g., "43"). When omitted, the latest version is used.
+  agentVersion: z.string().optional(),
 
   // System instructions for the agent.
   systemPrompt: z.string().default('You are a helpful assistant.'),
-
-  // Sampling temperature: 0 = deterministic, 1 = balanced, 2 = very creative.
-  temperature: z.number().min(0).max(2).default(0.7),
 
   // Max tokens the agent may generate per turn.
   maxTokens: z.number().int().positive().default(2048),

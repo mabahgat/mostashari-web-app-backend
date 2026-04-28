@@ -26,7 +26,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@azure/ai-agents": "^1.1.0",
+    "@azure/ai-projects": "^1.0.1",
     "@azure/core-auth": "^1.10.1",
     "@azure/identity": "^4.13.1",
     "@types/swagger-ui-express": "^4.1.8",
@@ -35,7 +35,6 @@
     "express-rate-limit": "^8.3.2",
     "ioredis": "^5.3.2",
     "js-yaml": "^4.1.0",
-    "openai": "^4.47.1",
     "openapi-types": "^12.1.3",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^9.0.0",
