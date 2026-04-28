@@ -38,7 +38,7 @@ function getOpenAIClient(): OpenAI {
   logger.debug('Azure AI Foundry client initialised', {
     baseURL,
     agentName: azure.agentName,
-    agentVersion: azure.agentVersion,
+    ...(azure.agentVersion ? { agentVersion: azure.agentVersion } : { agentVersion: 'latest' }),
   });
 
   return openaiClient;
@@ -72,7 +72,7 @@ export async function initAgent(): Promise<void> {
   const { azure } = loadConfig();
   logger.info('Using existing Azure AI agent', {
     agentName: azure.agentName,
-    agentVersion: azure.agentVersion,
+    agentVersion: azure.agentVersion ?? 'latest',
   });
 }
 
@@ -114,7 +114,7 @@ export async function sendMessage(conversationId: string, userMessage: string): 
     logger.debug('→ Azure AI agent request', {
       conversationId,
       agentName: azure.agentName,
-      agentVersion: azure.agentVersion,
+      agentVersion: azure.agentVersion ?? 'latest',
       userMessage,
     });
   }
@@ -130,7 +130,7 @@ export async function sendMessage(conversationId: string, userMessage: string): 
         body: {
           agent_reference: {
             name: azure.agentName,
-            version: azure.agentVersion,
+            ...(azure.agentVersion ? { version: azure.agentVersion } : {}),
             type: 'agent_reference',
           },
           input: userMessage,
@@ -160,7 +160,7 @@ export async function sendMessage(conversationId: string, userMessage: string): 
       status,
       conversationId,
       agentName: azure.agentName,
-      agentVersion: azure.agentVersion,
+      agentVersion: azure.agentVersion ?? 'latest',
       error: rawMessage,
       body,
     });
@@ -169,7 +169,7 @@ export async function sendMessage(conversationId: string, userMessage: string): 
       if (status === 404) {
         throw new Error(
           `Azure AI agent error 404 — resource not found.\n` +
-          `Check azure.projectEndpoint, azure.agentName, and azure.agentVersion in config.`
+          `Check azure.projectEndpoint and azure.agentName in config.`
         );
       }
       if (status === 401) {

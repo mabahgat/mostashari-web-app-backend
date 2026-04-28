@@ -42,9 +42,7 @@ azure:
 
   # Display name for the existing agent in Azure AI Foundry to reference.
   agentName: "chat-backend-agent"
-
-  # Version of the existing agent to reference (e.g., "43").
-  agentVersion: "1"
+  # agentVersion: "43"  # Optional: pin a specific version. Omit to use the latest.
 
   # Maximum number of tokens the model may generate per reply.
   maxTokens: 2048

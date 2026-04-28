@@ -28,8 +28,8 @@ const AzureConfigSchema = z.object({
   // Display name for the agent to reference in Azure AI Foundry.
   agentName: z.string().default('chat-backend-agent'),
 
-  // Version of the agent to reference (e.g., "43").
-  agentVersion: z.string().min(1),
+  // Version of the agent to reference (e.g., "43"). When omitted, the latest version is used.
+  agentVersion: z.string().optional(),
 
   // System instructions for the agent.
   systemPrompt: z.string().default('You are a helpful assistant.'),
