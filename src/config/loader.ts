@@ -43,6 +43,7 @@ function buildConfigFromEnv(): unknown {
       projectEndpoint,
       deployment: env.AZURE_DEPLOYMENT ?? '',
       agentName: env.AZURE_AGENT_NAME ?? '',
+      agentVersion: env.AZURE_AGENT_VERSION || undefined,
       maxTokens: env.AZURE_MAX_TOKENS ? parseInt(env.AZURE_MAX_TOKENS, 10) : 2048,
       responsesApiVersion: env.AZURE_RESPONSES_API_VERSION ?? '2025-03-01-preview',
     },
