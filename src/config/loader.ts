@@ -43,7 +43,6 @@ function buildConfigFromEnv(): unknown {
       projectEndpoint,
       deployment: env.AZURE_DEPLOYMENT ?? '',
       agentName: env.AZURE_AGENT_NAME ?? 'chat-backend-agent',
-      systemPrompt: env.SYSTEM_PROMPT ?? 'You are a helpful assistant.',
       temperature: env.AZURE_TEMPERATURE ? parseFloat(env.AZURE_TEMPERATURE) : 0.7,
       maxTokens: env.AZURE_MAX_TOKENS ? parseInt(env.AZURE_MAX_TOKENS, 10) : 2048,
       responsesApiVersion: env.AZURE_RESPONSES_API_VERSION ?? '2025-03-01-preview',
