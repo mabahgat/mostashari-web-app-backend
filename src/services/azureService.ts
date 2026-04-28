@@ -145,9 +145,11 @@ export async function sendMessage(conversationId: string, userMessage: string): 
     }
 
     if (verbose) {
+      const resolved = (response as unknown as Record<string, unknown>)['agent_reference'] as Record<string, unknown> | undefined;
       logger.debug('← Azure AI agent response', {
         conversationId,
         responseId: response.id,
+        resolvedAgentVersion: resolved?.['version'] ?? 'unknown',
         reply,
       });
     }
