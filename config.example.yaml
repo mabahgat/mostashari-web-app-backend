@@ -40,8 +40,11 @@ azure:
   # The model deployment name — find it under Models + endpoints → Name column.
   deployment: "gpt-4o"
 
-  # Display name for the agent in Azure AI Foundry (reused if already exists).
+  # Display name for the existing agent in Azure AI Foundry to reference.
   agentName: "chat-backend-agent"
+
+  # Version of the existing agent to reference (e.g., "43").
+  agentVersion: "1"
 
   # Maximum number of tokens the model may generate per reply.
   maxTokens: 2048
