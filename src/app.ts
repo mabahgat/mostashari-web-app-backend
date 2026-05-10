@@ -9,6 +9,7 @@ import sessionsRouter from './routes/sessions';
 import chatRouter from './routes/chat';
 import generateRouter from './routes/generate';
 import searchRouter from './routes/search';
+import modelRouter from './routes/model';
 import logger from './services/logger';
 import spec from './openapi/spec';
 import { loadConfig } from './config/loader';
@@ -81,6 +82,9 @@ app.use('/generate', globalLimiter, authenticate, generateRouter);
 
 // Search endpoint — auth required, global rate limiter applied
 app.use('/search', globalLimiter, authenticate, searchRouter);
+
+// Model info endpoint — auth required, global rate limiter applied
+app.use('/model', globalLimiter, authenticate, modelRouter);
 
 // 404 handler for unknown routes
 app.use((_req: Request, res: Response) => {

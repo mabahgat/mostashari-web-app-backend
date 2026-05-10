@@ -26,7 +26,9 @@ A Node.js + TypeScript REST API that forwards chat messages to **Azure AI Foundr
 - [API Reference](#api-reference)
   - [Endpoints overview](#endpoints-overview)
   - [`GET /health`](#get-health)
+  - [`GET /model`](#get-model)
   - [`POST /generate`](#post-generate)
+  - [`GET /model`](#get-model)
   - [`POST /search`](#post-search)
   - [`POST /sessions`](#post-sessions)
   - [`POST /sessions/:id/messages`](#post-sessionsidmessages)
@@ -389,7 +391,8 @@ The key is matched against `auth.apiKeys` in `config.yaml`. On a match, the corr
 │   │   └── spec.ts            # OpenAPI 3.0 document
 │   ├── routes/
 │   │   ├── sessions.ts        # POST/GET/DELETE /sessions
-│   │   └── chat.ts            # POST /sessions/:id/messages
+│   │   ├── chat.ts            # POST /sessions/:id/messages
+│   │   └── model.ts           # GET /model — agent version info
 │   ├── services/
 │   │   ├── stores/
 │   │   │   ├── ISessionStore.ts       # Store interface
@@ -453,7 +456,7 @@ A React app for end-to-end multi-turn chat testing.
 
 ## API Reference
 
-**Endpoints:** [`GET /health`](#get-health) · [`POST /generate`](#post-generate) · [`POST /search`](#post-search) · [`POST /sessions`](#post-sessions) · [`GET /sessions`](#get-sessions) · [`GET /sessions/:id`](#get-sessionsid) · [`DELETE /sessions/:id`](#delete-sessionsid) · [`POST /sessions/:id/messages`](#post-sessionsidmessages)
+**Endpoints:** [`GET /health`](#get-health) · [`GET /model`](#get-model) · [`POST /generate`](#post-generate) · [`POST /search`](#post-search) · [`POST /sessions`](#post-sessions) · [`GET /sessions`](#get-sessions) · [`GET /sessions/:id`](#get-sessionsid) · [`DELETE /sessions/:id`](#delete-sessionsid) · [`POST /sessions/:id/messages`](#post-sessionsidmessages)
 
 All `/sessions` and `/generate` and `/search` endpoints require the `X-API-Key` header (except in `dev` mode on localhost).
 
@@ -462,6 +465,7 @@ All `/sessions` and `/generate` and `/search` endpoints require the `X-API-Key` 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `GET` | `/health` | None | Server health check |
+| `GET` | `/model` | ✅ | Current agent info: version, model, tools |
 | `POST` | `/generate` | ✅ | Single-turn AI response (no session needed) |
 | `POST` | `/search` | ✅ | Search regulations or cases index |
 | `POST` | `/sessions` | ✅ | Create a new chat session |
@@ -484,6 +488,64 @@ GET /health
 ```json
 { "status": "ok", "timestamp": "2024-05-01T10:00:00.000Z" }
 ```
+
+---
+
+### `GET /model`
+
+Returns information about the currently configured Azure AI Foundry agent, including its version number, model, tools, and instructions. If `agentVersion` is set in config, returns that specific version; otherwise returns the latest version.
+
+```
+GET /model
+X-API-Key: <your-key>
+```
+
+**Response `200`**
+```json
+{
+  "deployment": "gpt-4o",
+  "id": "agent-7dec-1:44",
+  "name": "agent-7dec-1",
+  "version": "44",
+  "description": "",
+  "model": "gpt-5.4-mini",
+  "instructions": "You are a helpful legal assistant...",
+  "tools": [
+    { "type": "azure_ai_search", "azure_ai_search": { "indexes": [...] } }
+  ],
+  "toolResources": {},
+  "temperature": null,
+  "topP": null,
+  "responseFormat": "text",
+  "metadata": { "modified_at": "1778418774" },
+  "createdAt": "2026-05-10T13:12:55.000Z"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `deployment` | string | Model deployment name from config |
+| `id` | string | Agent version identifier (e.g. `agent-name:44`) |
+| `name` | string | Agent display name |
+| `version` | string \| null | Version number (e.g. `"44"`) — from API or config |
+| `description` | string \| null | Agent description |
+| `model` | string | Underlying model used by this agent version |
+| `instructions` | string \| null | System prompt / instructions configured on the agent |
+| `tools` | array | Tools attached to the agent (e.g. Azure AI Search, MCP) |
+| `toolResources` | object | Additional tool resources |
+| `temperature` | number \| null | Sampling temperature |
+| `topP` | number \| null | Top-p sampling parameter |
+| `responseFormat` | string \| null | Response format type |
+| `metadata` | object \| null | Agent metadata including `modified_at` timestamp |
+| `createdAt` | string \| null | ISO 8601 creation timestamp of this version |
+
+**Error responses**
+
+| Status | Code | Condition |
+|--------|------|-----------|
+| `401` | `UNAUTHORIZED` | Missing or invalid `X-API-Key` |
+| `429` | `RATE_LIMIT` | Exceeds global rate limit |
+| `502` | `UPSTREAM_ERROR` | Azure AI Foundry API returned an error |
 
 ---
 
@@ -1008,6 +1070,9 @@ BASE="http://localhost:3000"
 # Health check
 curl -s "$BASE/health" | jq .
 
+# Agent info (version, model, tools)
+curl -s "$BASE/model" | jq .
+
 # Single-turn generate (no session needed)
 curl -s -X POST "$BASE/generate" \
   -H "Content-Type: application/json" \
@@ -1061,6 +1126,9 @@ AUTH=(-H "X-API-Key: $KEY")
 
 # Health check (no auth needed)
 curl -s "$BASE/health" | jq .
+
+# Agent info
+curl -s "$BASE/model" "${AUTH[@]}" | jq '{name, version, model}'
 
 # Create a session
 SESSION=$(curl -s -X POST "$BASE/sessions" "${AUTH[@]}" | jq -r '.sessionId')
