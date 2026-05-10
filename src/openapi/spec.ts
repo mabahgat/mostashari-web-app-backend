@@ -99,6 +99,25 @@ const spec: OpenAPIV3.Document = {
           },
         },
       },
+      ModelInfo: {
+        type: 'object',
+        properties: {
+          deployment: { type: 'string', example: 'gpt-4o', description: 'The model deployment name from config.' },
+          id: { type: 'string', example: 'asst_srks7ikcWWjzHpfIb5IyyjYF', description: 'The assistant/agent ID in Azure AI Foundry.' },
+          name: { type: 'string', example: 'agent-7dec-1', description: 'The agent name in Azure AI Foundry.' },
+          version: { type: 'string', nullable: true, example: '44', description: 'The agent version number from Azure AI Foundry portal.' },
+          description: { type: 'string', nullable: true, description: 'Agent description.' },
+          model: { type: 'string', example: 'gpt-5-mini', description: 'The model used by the agent.' },
+          instructions: { type: 'string', nullable: true, description: 'System instructions configured for the agent.' },
+          tools: { type: 'array', items: { type: 'object' }, description: 'Tools enabled for the agent.' },
+          toolResources: { type: 'object', nullable: true, description: 'Resources used by the agent tools.' },
+          temperature: { type: 'number', nullable: true, example: 1, description: 'Sampling temperature.' },
+          topP: { type: 'number', nullable: true, example: 1, description: 'Nucleus sampling parameter.' },
+          responseFormat: { description: 'Response format setting.', nullable: true },
+          metadata: { type: 'object', nullable: true, additionalProperties: { type: 'string' }, description: 'Key/value metadata attached to the agent.' },
+          createdAt: { type: 'string', format: 'date-time', description: 'When the agent was created.' },
+        },
+      },
       GenerateResponse: {
         type: 'object',
         properties: {
@@ -240,6 +259,23 @@ const spec: OpenAPIV3.Document = {
               },
             },
           },
+        },
+      },
+    },
+    '/model': {
+      get: {
+        tags: ['System'],
+        summary: 'Get model and agent info',
+        description:
+          'Returns the currently configured model deployment, agent name, and agent version. ' +
+          'When agentVersion is not pinned in config, the latest version is resolved from Azure AI Foundry.',
+        responses: {
+          '200': {
+            description: 'Model and agent information',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ModelInfo' } } },
+          },
+          '401': { description: 'Unauthorized', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+          '502': { description: 'Failed to retrieve agent info from Azure AI Foundry', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
         },
       },
     },

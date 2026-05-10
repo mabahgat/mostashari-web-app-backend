@@ -1,10 +1,13 @@
 import OpenAI from 'openai';
+import { AIProjectClient } from '@azure/ai-projects';
 import { DefaultAzureCredential, getBearerTokenProvider } from '@azure/identity';
 import { loadConfig } from '../config/loader';
+import { UpstreamError } from '../middleware/errors';
 import logger from './logger';
 
 let openaiClient: OpenAI | null = null;
 let tokenProvider: (() => Promise<string>) | null = null;
+let projectClient: AIProjectClient | null = null;
 
 function isVerbose(): boolean {
   const { mode } = loadConfig();
@@ -191,3 +194,84 @@ export async function sendMessage(conversationId: string, userMessage: string): 
   }
 }
 
+export interface AgentInfo {
+  deployment: string;
+  id: string;
+  name: string;
+  version: string | null;
+  description: string | null;
+  model: string;
+  instructions: string | null;
+  tools: unknown[];
+  toolResources: unknown;
+  temperature: number | null;
+  topP: number | null;
+  responseFormat: unknown;
+  metadata: Record<string, string> | null;
+  createdAt: string;
+}
+
+function getProjectClient(): AIProjectClient {
+  if (projectClient) return projectClient;
+  const { azure } = loadConfig();
+  const credential = new DefaultAzureCredential();
+  projectClient = new AIProjectClient(azure.projectEndpoint, credential);
+  return projectClient;
+}
+
+/**
+ * Returns information about the currently configured agent.
+ * If agentVersion is pinned in config, retrieves that specific version.
+ * Otherwise, queries Azure AI Foundry to resolve the latest version.
+ */
+export async function getAgentInfo(): Promise<AgentInfo> {
+  const { azure } = loadConfig();
+
+  try {
+    const client = getProjectClient();
+    let version: any;
+
+    if (azure.agentVersion) {
+      version = await client.agents.getVersion(azure.agentName, azure.agentVersion);
+    } else {
+      const agent = await client.agents.get(azure.agentName);
+      version = agent.versions?.latest;
+      if (!version) {
+        throw new UpstreamError(
+          `Agent "${azure.agentName}" has no versions in Azure AI Foundry.`
+        );
+      }
+    }
+
+    const def = version.definition ?? {};
+    const result: AgentInfo = {
+      deployment: azure.deployment,
+      id: version.id,
+      name: version.name ?? azure.agentName,
+      version: version.version ?? null,
+      description: version.description ?? null,
+      model: def.model,
+      instructions: def.instructions ?? null,
+      tools: def.tools ?? [],
+      toolResources: {},
+      temperature: def.temperature ?? null,
+      topP: def.top_p ?? null,
+      responseFormat: def.text?.format?.type ?? null,
+      metadata: version.metadata ?? null,
+      createdAt: version.created_at ?? null,
+    };
+
+    logger.debug('Resolved agent from Azure AI Foundry', {
+      agentName: result.name,
+      agentId: result.id,
+      version: result.version,
+      model: result.model,
+    });
+
+    return result;
+  } catch (err) {
+    if (err instanceof UpstreamError) throw err;
+    const { message } = extractError(err);
+    throw new UpstreamError(`Failed to retrieve agent info from Azure AI Foundry: ${message}`);
+  }
+}
